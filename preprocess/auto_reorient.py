@@ -9,6 +9,7 @@
 # For inquiries contact  george.drettakis@inria.fr
 #
 
+import json
 import numpy as np
 import argparse
 from read_write_model import *
@@ -16,6 +17,7 @@ import torch
 import argparse
 import os, time
 from scipy import spatial
+from scipy.spatial.transform import Rotation as R
 
 def fit_plane_least_squares(points):
     # Augment the point cloud with a column of ones
@@ -149,6 +151,7 @@ if __name__ == '__main__':
     positions = torch.from_numpy(np.array(positions))
     
     # Perform the rotation by matrix multiplication
+    
     rotated_points = upscale * torch.matmul(positions, rotation_matrix)
 
 
@@ -184,6 +187,26 @@ if __name__ == '__main__':
     if not os.path.isdir(args.output_path):
         os.makedirs(args.output_path)
     write_model(cameras, images_metas_out, points3d_out, args.output_path, f".{args.model_type}")
+
+    # Convert rotation matrix to quaternion
+    rotation = R.from_matrix(rotation_matrix.T)
+    quaternion = rotation.as_quat()  # Returns in the order (x, y, z, w)
+
+    # Create the transformation dictionary in the same format as render_gaussian.py
+    transformation = {
+        "x": 0.0,  # Convert to float for JSON serialization
+        "y": 0.0,
+        "z": 0.0,
+        "qx": float(quaternion[0]),
+        "qy": float(quaternion[1]),
+        "qz": float(quaternion[2]),
+        "qw": float(quaternion[3]),
+        "scale": float(upscale)
+    }
+
+    # Save the transformation to transform.json
+    with open(args.output_path+'/transform.json', 'w') as json_file:
+        json.dump(transformation, json_file, indent=4)
 
     global_end = time.time()
 
